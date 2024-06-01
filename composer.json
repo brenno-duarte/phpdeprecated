@@ -1,0 +1,20 @@
+{
+    "name": "brenno-duarte/phpdeprecated",
+    "description": "PHP component used to search for deprecated resources in your project, such as classes, traits, enums, and others",
+    "license": "MIT",
+    "require": {
+        "php": ">= 8.3",
+        "composer/class-map-generator": "^1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Deprecated\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DeprecatedTest\\": "tests/"
+        }
+    },
+    "bin": "phpdeprecated"
+}

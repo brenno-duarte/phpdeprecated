@@ -1,0 +1,34 @@
+#!/usr/bin/env php
+<?php
+
+require_once 'vendor/autoload.php';
+
+use Composer\ClassMapGenerator\ClassMapGenerator;
+use Deprecated\DeprecatedManager;
+
+$dir = $argv[1];
+$opt = $argv[2] ?? null;
+
+$dir = str_replace([".\\", "./"], DIRECTORY_SEPARATOR, $dir);
+
+ob_start();
+
+foreach (glob($argv[1] . "*.php") as $filename) {
+    require_once $filename;
+}
+
+$functions = get_defined_functions()['user'];
+$output = ob_get_contents();
+ob_end_clean();
+unset($output);
+
+$map = ClassMapGenerator::createMap(__DIR__ . $dir);
+DeprecatedManager::checkForDeprecated($map, $functions);
+
+/** If options exists */
+/* if (!is_null($opt)) {
+    if ($opt == "--valid") {
+
+    }
+} */
+
