@@ -36,8 +36,8 @@ final class DeprecatedManager
      */
     public static function checkForDeprecated(array $map, array $functions): void
     {
-        $deprecated_class_exists = null;
-        $deprecated_function_exists = null;
+        $deprecated_class_exists = false;
+        $deprecated_function_exists = false;
 
         /** Read resources */
         ConsoleOutput::banner("Deprecated resources (class, interface, traits, ...)", ColorsEnum::BG_LIGHT_BLUE)
@@ -52,14 +52,13 @@ final class DeprecatedManager
         }
 
         /** Read functions */
-        ConsoleOutput::banner("Deprecated functions", ColorsEnum::BG_LIGHT_BLUE)->print()->break();
-
         if (!empty($functions)) {
             $deprecated_function_exists = DeprecatedManager::checkIfFunctionIsDeprecated($functions);
-        }
 
-        if ($deprecated_function_exists == false) {
-            ConsoleOutput::success("No deprecated functions found!")->print()->break();
+            if ($deprecated_function_exists == false) {
+                ConsoleOutput::banner("Deprecated functions", ColorsEnum::BG_LIGHT_BLUE)->print()->break();
+                ConsoleOutput::success("No deprecated functions found!")->print()->break();
+            }
         }
     }
 
@@ -72,78 +71,82 @@ final class DeprecatedManager
      */
     private static function checkIfObjectIsDeprecated(object|string $class): bool
     {
-        $reflection = new \ReflectionClass($class);
-        self::$class_name = $reflection->getName();
-        self::$attributes = $reflection->getAttributes();
+        try {
+            $reflection = new \ReflectionClass($class);
+            self::$class_name = $reflection->getName();
+            self::$attributes = $reflection->getAttributes();
 
-        self::checkIfObjectHasDeprecatedResource($class);
+            self::checkIfObjectHasDeprecatedResource($class);
 
-        /** If object is a class */
-        if (!$reflection->isTrait() && !$reflection->isInterface() && !$reflection->isEnum()) {
-            self::getDeprecatedAttributes("class", self::$class_name, self::$attributes);
-        }
+            /** If object is a class */
+            if (!$reflection->isTrait() && !$reflection->isInterface() && !$reflection->isEnum()) {
+                self::getDeprecatedAttributes("class", self::$class_name, self::$attributes);
+            }
 
-        /** If object ISN'T a class */
-        if ($reflection->isTrait()) {
-            self::getDeprecatedAttributes("trait", self::$class_name, self::$attributes);
-        }
+            /** If object ISN'T a class */
+            if ($reflection->isTrait()) {
+                self::getDeprecatedAttributes("trait", self::$class_name, self::$attributes);
+            }
 
-        if ($reflection->isInterface()) {
-            self::getDeprecatedAttributes("interface", self::$class_name, self::$attributes);
-        }
+            if ($reflection->isInterface()) {
+                self::getDeprecatedAttributes("interface", self::$class_name, self::$attributes);
+            }
 
-        if ($reflection->isEnum()) {
-            $reflection_enum = new \ReflectionEnum($class);
+            if ($reflection->isEnum()) {
+                $reflection_enum = new \ReflectionEnum($class);
 
-            foreach ($reflection_enum->getCases() as $case) {
+                foreach ($reflection_enum->getCases() as $case) {
+                    self::getDeprecatedAttributes(
+                        "enum case",
+                        $reflection_enum->getName() . "::" . $case->getName(),
+                        $case->getAttributes(static::ATTRIBUTE_NAME)
+                    );
+                }
+            }
+
+            /** Get all methods from object */
+            foreach ($reflection->getMethods() as $method) {
                 self::getDeprecatedAttributes(
-                    "enum case",
-                    $reflection_enum->getName() . "::" . $case->getName(),
-                    $case->getAttributes(static::ATTRIBUTE_NAME)
+                    "method",
+                    self::$class_name . "::" . $method->getName() . "()",
+                    $method->getAttributes(static::ATTRIBUTE_NAME)
                 );
             }
-        }
 
-        /** Get all methods from object */
-        foreach ($reflection->getMethods() as $method) {
-            self::getDeprecatedAttributes(
-                "method",
-                self::$class_name . "::" . $method->getName() . "()",
-                $method->getAttributes(static::ATTRIBUTE_NAME)
-            );
-        }
-
-        /** Get all properties from object */
-        foreach ($reflection->getProperties() as $property) {
-            self::getDeprecatedAttributes(
-                "property",
-                "$" . $property->getName(),
-                $property->getAttributes(static::ATTRIBUTE_NAME)
-            );
-        }
-
-        /** Get all static properties from object */
-        foreach ($reflection->getStaticProperties() as $staticProperties) {
-            self::getDeprecatedAttributes(
-                "static property",
-                "$" . $staticProperties->getName(),
-                $staticProperties->getAttributes()
-            );
-        }
-
-        /** Get all enums from object */
-        if (!$reflection->isEnum()) {
-            foreach ($reflection->getConstants() as $constant => $value) {
-                $reflection_constants = new \ReflectionClassConstant($class, $constant);
+            /** Get all properties from object */
+            foreach ($reflection->getProperties() as $property) {
                 self::getDeprecatedAttributes(
-                    "constant",
-                    self::$class_name . "::" . $reflection_constants->getName(),
-                    $reflection_constants->getAttributes(static::ATTRIBUTE_NAME)
+                    "property",
+                    "$" . $property->getName(),
+                    $property->getAttributes(static::ATTRIBUTE_NAME)
                 );
             }
-        }
 
-        return self::$deprecated_exists;
+            /** Get all static properties from object */
+            foreach ($reflection->getProperties(\ReflectionProperty::IS_STATIC) as $staticProperties) {
+                self::getDeprecatedAttributes(
+                    "static property",
+                    "$" . $staticProperties->getName(),
+                    $staticProperties->getAttributes()
+                );
+            }
+
+            /** Get all enums from object */
+            if (!$reflection->isEnum()) {
+                foreach ($reflection->getConstants() as $constant => $value) {
+                    $reflection_constants = new \ReflectionClassConstant($class, $constant);
+                    self::getDeprecatedAttributes(
+                        "constant",
+                        self::$class_name . "::" . $reflection_constants->getName(),
+                        $reflection_constants->getAttributes(static::ATTRIBUTE_NAME)
+                    );
+                }
+            }
+
+            return self::$deprecated_exists;
+        } catch (\ReflectionException) {
+            return false;
+        }
     }
 
     /**
@@ -248,5 +251,22 @@ final class DeprecatedManager
 
         $class = explode("\\", $classname);
         return end($class);
+    }
+
+    public static function classLoaderInDirectory(string $directory): void
+    {
+        $dir      = new \RecursiveDirectoryIterator($directory);
+        $iterator = new \RecursiveIteratorIterator($dir);
+
+        foreach ($iterator as $file) {
+            $fname = $file->getFilename();
+
+            if (preg_match('%\.php$%', $fname)) {
+                if (!str_contains($file->getPathname(), DIRECTORY_SEPARATOR . "vendor" . DIRECTORY_SEPARATOR)) {
+                    require_once $file->getPathname();
+                    //var_dump($file->getPathname());
+                }
+            }
+        }
     }
 }

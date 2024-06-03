@@ -1,10 +1,10 @@
 <?php
 
-namespace DeprecatedTest;
+namespace DeprecatedTest\Lib;
 
 use Deprecated\Deprecated;
 
 #[Deprecated()]
-interface UserInterface
+class ParentClass
 {
 }
