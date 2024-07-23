@@ -5,6 +5,12 @@ namespace DeprecatedTest;
 use Deprecated\Deprecated;
 use DeprecatedTest\Lib\{ParentClass, UserInterface, UserTrait};
 
+/**
+ * Test class comment
+ * 
+ * @deprecated Use other class
+ * @see link
+ */
 #[Deprecated()]
 class UserTest extends ParentClass implements UserInterface
 {

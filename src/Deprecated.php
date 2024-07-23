@@ -35,9 +35,9 @@ final class Deprecated
      * @param string $type
      * @param string $name
      * 
-     * @return string
+     * @return void
      */
-    public function addDeprecatedMessage(string $type, string $name, ?string $class_name = null)
+    public function addDeprecatedMessage(string $type, string $name, ?string $class_name = null): void
     {
         (!is_null($class_name)) ? $class_name = " in " . $class_name : "";
         $name = ConsoleOutput::warning($name)->getMessage();
@@ -46,11 +46,9 @@ final class Deprecated
         if ($this->since != null) $message = $message . " since " . $this->since;
         if ($this->message != null) $message = $message . ", " . $this->message;
 
-        if (is_null($class_name)) {
-            ConsoleOutput::info("Deprecated:")->print();
-        } else {
-            ConsoleOutput::info("Resource deprecated:")->print();
-        }
+        (is_null($class_name)) ?
+            ConsoleOutput::error("Deprecated:")->print() :
+            ConsoleOutput::info("Deprecated in class:")->print();
 
         ConsoleOutput::line(" " . $message)->print()->break();
     }

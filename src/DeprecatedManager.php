@@ -2,10 +2,13 @@
 
 namespace Deprecated;
 
-use Deprecated\Output\{ColorsEnum, ConsoleOutput};
+use Deprecated\Output\ConsoleOutput;
+use TypeLang\PHPDoc\Parser;
 
 final class DeprecatedManager
 {
+    const VERSION = "1.1.0";
+
     /**
      * @var string
      */
@@ -15,6 +18,11 @@ final class DeprecatedManager
      * @var array
      */
     private static array $attributes = [];
+
+    /**
+     * @var string
+     */
+    private static string $doc_comments = "";
 
     /**
      * @var bool|null|null
@@ -40,23 +48,22 @@ final class DeprecatedManager
         $deprecated_function_exists = false;
 
         /** Read resources */
-        ConsoleOutput::banner("Deprecated resources (class, interface, traits, ...)", ColorsEnum::BG_LIGHT_BLUE)
-            ->print()->break();
+        ConsoleOutput::success("\nPHP Deprecated " . self::VERSION)->print()->break(true);
 
         foreach ($map as $namespace => $file) {
             $deprecated_class_exists = DeprecatedManager::checkIfObjectIsDeprecated($namespace);
         }
 
         if ($deprecated_class_exists == false) {
-            ConsoleOutput::success("No deprecated resources found!")->print()->break();
+            ConsoleOutput::success("No deprecated file found!")->print()->break();
         }
 
         /** Read functions */
         if (!empty($functions)) {
-            $deprecated_function_exists = DeprecatedManager::checkIfFunctionIsDeprecated($functions);
+            $deprecated_function_exists = self::checkIfFunctionIsDeprecated($functions);
 
             if ($deprecated_function_exists == false) {
-                ConsoleOutput::banner("Deprecated functions", ColorsEnum::BG_LIGHT_BLUE)->print()->break();
+                //ConsoleOutput::banner("Deprecated functions", ColorsEnum::BG_LIGHT_BLUE)->print()->break();
                 ConsoleOutput::success("No deprecated functions found!")->print()->break();
             }
         }
@@ -75,6 +82,7 @@ final class DeprecatedManager
             $reflection = new \ReflectionClass($class);
             self::$class_name = $reflection->getName();
             self::$attributes = $reflection->getAttributes();
+            self::$doc_comments = $reflection->getDocComment();
 
             self::checkIfObjectHasDeprecatedResource($class);
 
@@ -161,6 +169,7 @@ final class DeprecatedManager
         $reflection = new \ReflectionClass($class);
         self::$class_name = $reflection->getName();
         self::$attributes = $reflection->getAttributes();
+        self::$doc_comments = $reflection->getDocComment();
 
         foreach ($reflection->getTraits() as $trait) {
             if (!empty($trait)) {
@@ -209,6 +218,7 @@ final class DeprecatedManager
     {
         foreach ($functions as $function) {
             $reflection = new \ReflectionFunction($function);
+            self::$doc_comments = $reflection->getDocComment();
             self::getDeprecatedAttributes("function", $reflection->getName() . "()", $reflection->getAttributes());
         }
 
@@ -240,7 +250,38 @@ final class DeprecatedManager
                     $instance->addDeprecatedMessage($type, $name, $class_name);
                 }
             }
+        } elseif (self::$doc_comments != "") {
+            $parser = new Parser();
+            $result = $parser->parse(self::$doc_comments);
+
+            foreach ($result->getTags() as $tag) {
+                if (str_starts_with($tag, "@deprecated")) {
+                    self::$deprecated_exists = true;
+                    self::addDeprecatedMessageFromDoc($tag, $type, $name, $class_name);
+                }
+            }
         }
+    }
+
+    private static function addDeprecatedMessageFromDoc(
+        string $tag,
+        string $type,
+        string $name,
+        ?string $class_name = null
+    ): void {
+        (!is_null($class_name)) ? $class_name = " in " . $class_name : "";
+        $name = ConsoleOutput::warning($name)->getMessage();
+        $message = ucfirst($type) . " " . $name . " is deprecated" . $class_name;
+
+        /* $get_message = trim(str_replace("@deprecated", "", $tag));
+        if ($this->since != null) $message = $message . " since " . $this->since;
+        if ($get_message != "") $message = $message . ", " . $get_message; */
+
+        (is_null($class_name)) ?
+            ConsoleOutput::error("Deprecated:")->print() :
+            ConsoleOutput::info("Deprecated in class:")->print();
+
+        ConsoleOutput::line(" " . $message)->print()->break();
     }
 
     private static function getClassWithoutNamespace(string|object $classname): string

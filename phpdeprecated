@@ -6,7 +6,14 @@ require_once 'vendor/autoload.php';
 use Composer\ClassMapGenerator\ClassMapGenerator;
 use Deprecated\DeprecatedManager;
 
-$dir = dirname(__DIR__, 3) . $argv[1];
+if (file_exists(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . "autoload.php")) {
+    $dir = dirname(__DIR__, 3) . $argv[1];
+} else {
+    $dir = __DIR__ . $argv[1];
+}
+
+clearstatcache();
+
 $opt = $argv[2] ?? null;
 $dir = str_replace([".\\", "./"], DIRECTORY_SEPARATOR, $dir);
 
