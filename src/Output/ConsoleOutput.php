@@ -201,12 +201,12 @@ class ConsoleOutput
      *
      * @param mixed $message
      * @param string $title
-     * @param int|ColorsEnum $color
+     * @param mixed $color
      * 
      * @return static
      * @throws \Exception
      */
-    public static function debugMessage(mixed $message, string $title = 'INFO', int|ColorsEnum $color = null): static
+    public static function debugMessage(mixed $message, string $title = 'INFO', mixed $color = null): static
     {
         self::generateColors();
 
@@ -431,7 +431,7 @@ class ConsoleOutput
         if (
             empty($_SERVER['REMOTE_ADDR']) &&
             !isset($_SERVER['HTTP_USER_AGENT']) &&
-            count($_SERVER['argv']) > 0
+            count((array)$_SERVER['argv']) > 0
         ) {
             return true;
         }

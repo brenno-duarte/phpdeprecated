@@ -7,7 +7,7 @@ use TypeLang\PHPDoc\Parser;
 
 final class DeprecatedManager
 {
-    const VERSION = "1.1.0";
+    const VERSION = "1.2.0";
 
     /**
      * @var string
@@ -63,7 +63,6 @@ final class DeprecatedManager
             $deprecated_function_exists = self::checkIfFunctionIsDeprecated($functions);
 
             if ($deprecated_function_exists == false) {
-                //ConsoleOutput::banner("Deprecated functions", ColorsEnum::BG_LIGHT_BLUE)->print()->break();
                 ConsoleOutput::success("No deprecated functions found!")->print()->break();
             }
         }
@@ -107,7 +106,7 @@ final class DeprecatedManager
                     self::getDeprecatedAttributes(
                         "enum case",
                         $reflection_enum->getName() . "::" . $case->getName(),
-                        $case->getAttributes(static::ATTRIBUTE_NAME)
+                        $case->getAttributes()
                     );
                 }
             }
@@ -117,7 +116,7 @@ final class DeprecatedManager
                 self::getDeprecatedAttributes(
                     "method",
                     self::$class_name . "::" . $method->getName() . "()",
-                    $method->getAttributes(static::ATTRIBUTE_NAME)
+                    $method->getAttributes()
                 );
             }
 
@@ -125,8 +124,8 @@ final class DeprecatedManager
             foreach ($reflection->getProperties() as $property) {
                 self::getDeprecatedAttributes(
                     "property",
-                    "$" . $property->getName(),
-                    $property->getAttributes(static::ATTRIBUTE_NAME)
+                    $reflection->getName() . "::" . "$" . $property->getName(),
+                    $property->getAttributes()
                 );
             }
 
@@ -134,7 +133,7 @@ final class DeprecatedManager
             foreach ($reflection->getProperties(\ReflectionProperty::IS_STATIC) as $staticProperties) {
                 self::getDeprecatedAttributes(
                     "static property",
-                    "$" . $staticProperties->getName(),
+                    $reflection->getName() . "::" . "$" . $staticProperties->getName(),
                     $staticProperties->getAttributes()
                 );
             }
@@ -146,7 +145,7 @@ final class DeprecatedManager
                     self::getDeprecatedAttributes(
                         "constant",
                         self::$class_name . "::" . $reflection_constants->getName(),
-                        $reflection_constants->getAttributes(static::ATTRIBUTE_NAME)
+                        $reflection_constants->getAttributes()
                     );
                 }
             }
@@ -176,7 +175,7 @@ final class DeprecatedManager
                 self::getDeprecatedAttributes(
                     "trait",
                     self::getClassWithoutNamespace($trait->getName()),
-                    $trait->getAttributes(static::ATTRIBUTE_NAME),
+                    $trait->getAttributes(),
                     self::$class_name
                 );
             }
@@ -187,7 +186,7 @@ final class DeprecatedManager
                 self::getDeprecatedAttributes(
                     "interface",
                     self::getClassWithoutNamespace($interface->getName()),
-                    $interface->getAttributes(static::ATTRIBUTE_NAME),
+                    $interface->getAttributes(),
                     self::$class_name
                 );
             }
@@ -219,7 +218,11 @@ final class DeprecatedManager
         foreach ($functions as $function) {
             $reflection = new \ReflectionFunction($function);
             self::$doc_comments = $reflection->getDocComment();
-            self::getDeprecatedAttributes("function", $reflection->getName() . "()", $reflection->getAttributes());
+            self::getDeprecatedAttributes(
+                "function",
+                $reflection->getName() . "()",
+                $reflection->getAttributes()
+            );
         }
 
         return self::$deprecated_exists;
@@ -247,6 +250,9 @@ final class DeprecatedManager
                 if ($deprecated_attr === self::ATTRIBUTE_NAME) {
                     self::$deprecated_exists = true;
                     $instance = $attribute->newInstance();
+                    $instance->addDeprecatedMessage($type, $name, $class_name);
+                } elseif ($deprecated_attr === \Deprecated::class) {
+                    $instance = new Deprecated();
                     $instance->addDeprecatedMessage($type, $name, $class_name);
                 }
             }
@@ -303,9 +309,11 @@ final class DeprecatedManager
             $fname = $file->getFilename();
 
             if (preg_match('%\.php$%', $fname)) {
-                if (!str_contains($file->getPathname(), DIRECTORY_SEPARATOR . "vendor" . DIRECTORY_SEPARATOR)) {
+                if (!str_contains(
+                    $file->getPathname(),
+                    DIRECTORY_SEPARATOR . "vendor" . DIRECTORY_SEPARATOR
+                )) {
                     require_once $file->getPathname();
-                    //var_dump($file->getPathname());
                 }
             }
         }
